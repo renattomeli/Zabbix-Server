@@ -1,0 +1,187 @@
+---
+
+  - name: Add repository PagerDuty
+    yum_repository:
+      name: PDAgent
+      description: PagerDuty YUM repo
+      baseurl: https://packages.pagerduty.com/pdagent/rpm
+      enabled: yes
+      gpgcheck: yes
+      gpgkey: https://packages.pagerduty.com/GPG-KEY-RPM-pagerduty
+
+  - name: Install PagerDuty
+    yum:
+      name:
+        - pdagent 
+        - pdagent-integrations
+    notify:
+      - start pagerduty
+
+  - name: Create link to PagerDuty in Zabbix Alerts
+    file:
+      src: /usr/share/pdagent-integrations/bin/pd-zabbix
+      dest: /usr/lib/zabbix/alertscripts/pd-zabbix
+      state: link
+
+  - name: Get authentication token Zabbix
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: user.login
+        id: 1
+        auth: null
+        params: 
+          user: Admin
+          password: "zabbix"
+      return_content: yes
+    register: auth
+
+  - name: Check if media type PagerDuty exist
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: mediatype.get
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          filter:
+            description: "PagerDuty"
+      return_content: yes
+    register: mediatype_id
+
+  - set_fact:
+      mediatype_id: '{{ mediatype_id | json_query("json.result[0].mediatypeid") }}'
+
+  - debug:
+      msg: '{{ mediatype_id }}'
+
+  - name: Create media type PagerDuty
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: mediatype.create
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          type: 1
+          description: PagerDuty
+          exec_path: pd-zabbix
+          exec_params: "{ALERT.SENDTO}\n{ALERT.SUBJECT}\n{ALERT.MESSAGE}\n"
+          maxattempts: 3
+      return_content: yes
+    register: mediatype_ids
+    when: mediatype_id == ""
+  
+  - set_fact:
+      mediatype_id: '{{ mediatype_ids | json_query("json.result.mediatypeids[0]") }}'
+    when: mediatype_id == ""
+
+  - debug:
+      msg: '{{ mediatype_id }}'
+
+  - name: Create user group Integrations
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: usergroup.create
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          name: Integrations
+          gui_access: 3
+      return_content: yes
+    register: id_hostgroup
+
+  - debug:
+      msg: '{{ id_hostgroup | json_query("json.result.usrgrpids[0]") }}'
+
+  - name: Create user PagerDuty
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: user.create
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          alias: PagerDuty {{ pd_name }}
+          passwd: "{{ lookup('password', '/dev/null length=12 chars=ascii_letters') }}"
+          usrgrps:
+            - usrgrpid: '{{ id_hostgroup | json_query("json.result.usrgrpids[0]") }}'
+          user_medias:
+            - mediatypeid: '{{ mediatype_id }}'
+              sendto:
+                '{{ token_pagerduty }}'
+              active: 0
+              severity: 32
+          type: 3
+    register: id_usr_pd
+
+  - debug:
+      msg: '{{ id_usr_pd | json_query("json.result.userids[0]") }}'
+
+  - name: Create action to Pagerduty
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: action.create
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          name: PagerDuty {{ pd_name }}
+          status: 0
+          eventsource: 0
+          def_shortdata: trigger
+          def_longdata: "name:{TRIGGER.NAME}\nid:{TRIGGER.ID}\nstatus:{TRIGGER.STATUS}\nhostname:{HOSTNAME}\nip:{IPADDRESS}\nvalue:{TRIGGER.VALUE}\nevent_id:{EVENT.ID}\nseverity:{TRIGGER.SEVERITY}"
+          operations:
+            - operationtype: 0
+              opmessage:
+                mediatypeid: '{{ mediatype_id }}'
+                default_msg: 1
+              opmessage_usr:
+                - userid: '{{ id_usr_pd | json_query("json.result.userids[0]") }}'
+          r_shortdata: resolve
+          r_longdata: "name:{TRIGGER.NAME}\nid:{TRIGGER.ID}\nstatus:{TRIGGER.STATUS}\nhostname:{HOSTNAME}\nip:{IPADDRESS}\nvalue:{TRIGGER.VALUE}\nevent_id:{EVENT.ID}\nseverity:{TRIGGER.SEVERITY}"
+          recovery_operations:
+            - operationtype: 0
+              opmessage:
+                mediatypeid: '{{ mediatype_id }}'
+                default_msg: 1
+              opmessage_usr:
+                - userid: '{{ id_usr_pd | json_query("json.result.userids[0]") }}'
+          ack_shortdata: acknowledge
+          ack_longdata: "name:{TRIGGER.NAME}\nid:{TRIGGER.ID}\nstatus:{TRIGGER.STATUS}\nhostname:{HOSTNAME}\nip:{IPADDRESS}\nvalue:{TRIGGER.VALUE}\nevent_id:{EVENT.ID}\nseverity:{TRIGGER.SEVERITY}"
+          acknowledge_operations:
+            - operationtype: 0
+              opmessage:
+                mediatypeid: '{{ mediatype_id }}'
+                default_msg: 1
+              opmessage_usr:
+                - userid: '{{ id_usr_pd | json_query("json.result.userids[0]") }}'
+    register: action_return
+  
+  - debug:
+      msg: '{{ action_return | json_query("json.result.actionids[0]") }}'

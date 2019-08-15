@@ -1,0 +1,4 @@
+  - name: start pagerduty
+    service:
+      name: pdagent
+      state: started

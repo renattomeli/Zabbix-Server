@@ -1,0 +1,4 @@
+---
+
+  - name: php-fpm
+    src: https://gitlab.com/Rivendel-Labs/ansible/roles/php-fpm/repository/master/archive.tar.gz?private_token=D2SZKVPuCg2Sks-yy8D7

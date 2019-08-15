@@ -1,0 +1,28 @@
+---
+  - name: restart mysql
+    service:
+      name: mysqld
+      state: restarted
+      enabled: yes
+      use: "{{ (ansible_distribution_major_version|int == 7 and ansible_distribution == 'CentOS') | ternary('systemd', 'auto') }}"
+    when:
+      - ansible_virtualization_type != 'docker' or (ansible_distribution_major_version|int == 7 and ansible_distribution == 'CentOS') or (ansible_distribution_version == 'Candidate' and ansible_distribution == 'Amazon')
+    tags: mysql
+
+  - name: restart mysql docker
+    service:
+      name: mysqld
+      state: restarted
+      enabled: yes
+    when:
+      - ansible_virtualization_type == 'docker' and not (ansible_distribution_major_version|int == 7 and ansible_distribution == 'CentOS') and not (ansible_os_family == 'Debian')
+    tags: mysql
+
+  - name: restart mysql debian
+    service:
+      name: mysql
+      state: restarted
+      enabled: yes
+    when:
+      - ansible_os_family == 'Debian'
+    tags: mysql

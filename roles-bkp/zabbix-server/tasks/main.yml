@@ -1,0 +1,155 @@
+---
+
+  - name: Install base Packages
+    package:
+      name:
+        - MySQL-python
+        - python-pip
+        - python-devel
+      state: latest
+    tags:
+      - zabbix-server
+
+  - name: Install Pip Packages  
+    pip:
+      name: 
+        - PyMySQL
+        - PyZabbix
+    tags:
+      - zabbix-server
+
+  - name: Install Zabbix Release
+    yum:
+      name: "{{ url_zabbix_server }}"
+      state: present
+    tags:
+      - zabbix-server
+
+  - name: Install Zabbix packeges
+    yum:
+      name: "{{ packeges }}"
+    vars:
+      packeges:
+      - zabbix-server-mysql
+      - zabbix-web-mysql
+      - zabbix-agent
+      - zabbix-get
+    tags:
+      - zabbix-server
+
+  - name: Check if MySQL started
+    service:
+      name: mysqld
+      state: started
+      enabled: yes
+
+  - name: Create a new database for Zabbix Server
+    mysql_db:
+      name: "{{ zbx_db_name }}"
+      state: present
+      encoding: utf8
+      collation: utf8_bin
+    tags:
+      - zabbix-server
+
+  - name: Creates Zabbix server MySQL user
+    mysql_user:
+      name: "{{ zbx_db_user }}"
+      password: "{{ zbx_db_pass }}"
+      priv: "{{ zbx_db_name }}.*:ALL"
+      state: present
+    tags:
+      - zabbix-server
+
+  - name: Check if schema for Zabbix Server already loaded
+    shell: mysql -u{{ zbx_db_user }} -p{{ zbx_db_pass }} {{ zbx_db_name }} -e "SHOW TABLES LIKE 'users'" -sN
+    register: dbstatus
+    failed_when: dbstatus.rc == 2
+    tags:
+      - zabbix-server
+
+  - name: Copy schema DB
+    shell: cp /usr/share/doc/zabbix-server-mysql-*/create.sql.gz /tmp
+    tags:
+      - zabbix-server
+
+  - name: Import database Zabbix
+    mysql_db:
+      name: "{{ zbx_db_name }}"
+      state: import
+      target: /tmp/create.sql.gz
+    tags:
+      - zabbix-server
+      
+  - name: Configure Zabbix Server
+    template:
+      src: zabbix_server.conf.j2
+      dest: /etc/zabbix/zabbix_server.conf
+    notify:
+      - restart zabbix-server
+    tags:
+      - zabbix-server
+
+  - name: Configure Zabbix Server Web
+    template:
+      src: zabbix.conf.php.j2
+      dest: /etc/zabbix/web/zabbix.conf.php
+    tags:
+      - zabbix-server
+    notify:
+      - Start zabbix-server
+      - Start zabbix-agent
+
+  - name: Configure Zabbix Agent
+    template:
+      src: zabbix_agentd.conf.j2
+      dest: /etc/zabbix/zabbix_agentd.conf
+    notify:
+      - restart zabbix-agent
+    tags:
+      - zabbix-server
+
+  - name: Force all notified handlers to run at this point, not waiting for normal sync points
+    meta: flush_handlers
+
+  - name: Get authentication token Zabbix
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: user.login
+        id: 1
+        auth: null
+        params: 
+          user: Admin
+          password: zabbix
+      return_content: yes
+    register: auth
+
+  - name: Register of item server.status
+    uri:
+      url: http://localhost/api_jsonrpc.php
+      body_format: json
+      headers:
+        Content-type: application/json
+      body: 
+        jsonrpc: 2.0
+        method: item.create
+        id: 1
+        auth: '{{ auth | json_query("json.result")}}'
+        params:
+          name: Status Zabbix Server
+          key_: server.status
+          hostid: 10084
+          type: 0
+          value_type: 0
+          interfaceid: 1
+          delay: 30
+      return_content: yes
+    register: id_item
+
+  - debug:
+      msg: '{{ (id_item | json_query("json.result.itemids[0]")) or (id_item | json_query("json.error.data")) }}'

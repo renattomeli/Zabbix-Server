@@ -1,0 +1,137 @@
+---
+
+  - name: Install nginx repository (CentOS/Amazon Linux)
+    yum_repository:
+      name: nginx-repo
+      description: nginx repository
+      baseurl: http://nginx.org/packages/centos/{{ ((ansible_distribution == 'CentOS' and ansible_distribution_major_version|int == 7) or ansible_distribution == 'Amazon')  | ternary('7', '6') }}/$basearch/
+      gpgcheck: no
+      enabled: yes
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Amazon'
+    tags: nginx
+
+  - name: Install nginx repository key (Debian)
+    apt_key:
+      url: http://nginx.org/keys/nginx_signing.key
+      state: present
+    when: ansible_distribution == 'Debian'
+    tags: nginx
+
+  - name: Install nginx repository (Debian)
+    apt_repository:
+      repo: deb http://nginx.org/packages/debian/ {{ ansible_distribution_release }} nginx
+      state: present
+      filename: nginx-repo
+      update_cache: yes
+    when: ansible_distribution == 'Debian'
+    tags: nginx
+
+  - name: yum-clean-all
+    command: yum clean all
+    args:
+      warn: no
+    when: ansible_distribution == 'CentOS'
+    tags: nginx
+
+  - name: Install nginx packages
+    package:
+      name: "{{ item }}"
+      state: present
+      update_cache: yes
+    with_items:
+      - "{{ packages[ansible_os_family] }}"
+    tags: nginx
+
+  - name: Configure nginx
+    template:
+      src: etc/nginx/nginx.conf.j2
+      dest: /etc/nginx/nginx.conf
+    notify:
+      - restart nginx
+    tags: nginx
+
+  - name: Create ssl directory
+    file:
+      path: "{{ nginx_ssl_path }}"
+      state: directory
+    when: nginx_ssl_enabled
+    tags: nginx
+
+  - name: Generate dhparam
+    command: "openssl dhparam -out {{ nginx_ssl_path }}/dhparam.pem 2048"
+    args:
+      creates: "{{ nginx_ssl_path }}/dhparam.pem"
+    when: nginx_ssl_enabled
+    tags: nginx
+
+  - name: Install nginx ssl certificate key
+    copy:
+      content: "{{ nginx_ssl_key | b64decode }}"
+      dest: "{{ nginx_ssl_path }}/{{ nginx_server_name }}.key"
+    when: nginx_ssl_enabled and nginx_ssl_key is defined
+    tags: nginx
+
+  - name: Install nginx ssl certificate file
+    copy:
+      content: "{{ nginx_ssl_crt | b64decode }}"
+      dest: "{{ nginx_ssl_path }}/{{ nginx_server_name }}.crt"
+    when: nginx_ssl_enabled and nginx_ssl_crt is defined
+    tags: nginx
+
+  - name: Generate self-signed RSA key
+    command: openssl genrsa \
+      -out "{{ nginx_ssl_path }}/{{ nginx_server_name }}.key" 2048
+    args:
+      creates: "{{ nginx_ssl_path }}/{{ nginx_server_name }}.key"
+    when: nginx_ssl_enabled and nginx_ssl_key is undefined and nginx_ssl_crt is undefined
+    tags: nginx
+
+  - name: Generate self-signed CSR
+    command: openssl req \
+         -new \
+         -subj '/C=US/ST=CA/L=Mountain View/O=self-signed/CN={{ nginx_server_name }}'
+         -key "{{ nginx_ssl_path }}/{{ nginx_server_name }}.key" \
+         -out "{{ nginx_ssl_path }}/{{ nginx_server_name }}.csr"
+    args:
+      creates: "{{ nginx_ssl_path }}/{{ nginx_server_name }}.csr"
+    when: nginx_ssl_enabled and nginx_ssl_key is undefined and nginx_ssl_crt is undefined
+    tags: nginx
+
+  - name: Generate self-signed certificate
+    command: openssl req \
+      -x509 \
+      -days 1825 \
+      -key "{{ nginx_ssl_path }}/{{ nginx_server_name }}.key" \
+      -in "{{ nginx_ssl_path }}/{{ nginx_server_name }}.csr" \
+      -out "{{ nginx_ssl_path }}/{{ nginx_server_name }}.crt"
+    args:
+      creates: "{{ nginx_ssl_path }}/{{ nginx_server_name }}.crt"
+    when: nginx_ssl_enabled and nginx_ssl_key is undefined and nginx_ssl_crt is undefined
+    tags: nginx
+
+  - name: Configure nginx ssl params
+    template:
+      src: etc/nginx/ssl_params.conf.j2
+      dest: /etc/nginx/ssl_params.conf
+    when: nginx_ssl_enabled
+    notify:
+      - restart nginx
+    tags: nginx
+
+  - name: Removing default config files
+    file:
+      path: "{{ item }}"
+      state: absent
+    with_fileglob:
+      - /etc/nginx/conf.d/*.conf
+    notify:
+      - restart nginx
+    tags: nginx
+
+  - name: Install default website
+    template:
+      src: etc/nginx/conf.d/default.conf.j2
+      dest: /etc/nginx/conf.d/default.conf
+    notify:
+      - restart nginx
+    tags: nginx

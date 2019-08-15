@@ -1,0 +1,23 @@
+[mysqld]
+datadir = {{ mysql_datadir }}
+
+{% if mysql_socket_enabled == true %}
+socket = /var/lib/mysql/mysql.sock
+{% else %}
+bind-address = {{ mysql_bind_address }}
+port = {{ mysql_port }}
+{% endif %}
+
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+
+{% if ansible_distribution == "CentOS" %}
+# Recommended in standard MySQL setup
+sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
+{% endif %}
+
+{% if ansible_distribution == "CentOS" or ansible_distribution == "Amazon" %}
+[mysqld_safe]
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+{% endif %}
