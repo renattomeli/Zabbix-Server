@@ -1,0 +1,14 @@
+---
+
+
+- name: instalando Zabbix Pagerduty 
+  hosts: all
+  become: true
+  
+  vars:
+    ec2_ip: "{{lookup('file','ec2_ip')}}" 
+    token_pagerduty: "tokenpager"
+    pd_name: "Mandic"
+
+  roles:
+    - zabbix-server
