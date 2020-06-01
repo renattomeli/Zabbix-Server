@@ -1,0 +1,115 @@
+---
+
+php_version: "7.0"
+
+php_set_version: "{{ php_version | string }}"
+
+php_str_version: "{{ php_set_version | regex_replace('^([5]).*$', '\\1')}}"
+
+package_name: "{{ ansible_os_family}}_php{{ php_set_version }}"
+
+centos_php_version: "{{ php_set_version | replace('.', '') }}"
+debian_php_version: "{{ php_set_version }}"
+
+RedHat_package:
+  "5.4":
+    destination: "/opt/remi/php54/root/etc/php-fpm.d/www.conf"
+    binary_path: "/opt/remi/php54/root/usr/bin/php"
+  "5.5":
+    destination: "/opt/remi/php55/root/etc/php-fpm.d/www.conf"
+    binary_path: "/opt/remi/php55/root//usr/bin/php"
+  "5.6":
+    destination: "/opt/remi/php56/root/etc/php-fpm.d/www.conf"
+    binary_path: "/opt/remi/php56/root/usr/bin/php"
+  "7.0":
+    destination: "/etc/opt/remi/php70/php-fpm.d/www.conf"
+    binary_path: "/opt/remi/php70/root/usr/bin/php"
+
+debian_package:
+  "5.3":
+    repo_date: "20120221T041601Z"
+    php_deb_version: "5.3.10-2"
+    destination: "/etc/php5/fpm/pool.d/www.conf"
+  "5.4":
+    repo_date: "20130512T154713Z"
+    php_deb_version: "5.4.15-1"
+    destination: "/etc/php5/fpm/pool.d/www.conf"
+    service_name: php5-fpm
+  "5.5":
+    repo_date: "20140512T232448Z"
+    php_deb_version: "5.5.12+dfsg-2"
+    destination: "/etc/php5/fpm/pool.d/www.conf"
+    service_name: php5-fpm
+  "5.6":
+    repo_date: "20160918T165732Z"
+    php_deb_version: "5.6.26+dfsg-1"
+    destination: "/etc/php5/fpm/pool.d/www.conf"
+    service_name: php5-fpm
+  "7.0":
+    repo_date: "20151230T001013Z"
+    php_deb_version: "7.0"
+    destination: "/etc/php/7.0/fpm/pool.d/www.conf"
+    service_name: php7.0-fpm
+
+php_number_version: "{{ debian_package[php_version[:1]] }}"
+
+php_fpm_service_name:
+  Debian:
+    "php{{ debian_php_package_version }}-fpm"
+  RedHat:
+    "php{{ centos_php_version }}-php-fpm"
+
+packages:
+  Debian_php5.3:
+    - php5={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-fpm={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-common={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-ldap={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-gd={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-mysql={{ debian_package[php_set_version]["php_deb_version"] }}
+
+  Debian_php5.4:
+    - php5={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-fpm={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-common={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-ldap={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-gd={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-mysql={{ debian_package[php_set_version]["php_deb_version"] }}
+
+  Debian_php5.5:
+    - php5={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-fpm={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-common={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-ldap={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-gd={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-mysql={{ debian_package[php_set_version]["php_deb_version"] }}
+
+  Debian_php5.6:
+    - php5={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-fpm={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-common={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-ldap={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-gd={{ debian_package[php_set_version]["php_deb_version"] }}
+    - php5-mysql={{ debian_package[php_set_version]["php_deb_version"] }}
+
+
+  Debian_php7.0:
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-fpm
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-common
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-xml
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-bcmath
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-ldap
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-gd
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-mbstring
+    - php{{ debian_package[php_set_version]["php_deb_version"] }}-mysql
+  RedHat:
+    - php{{ centos_php_version }}
+    - php{{ centos_php_version }}-php-fpm
+    - php{{ centos_php_version }}-php-common
+    - php{{ centos_php_version }}-php-xml
+    - php{{ centos_php_version }}-php-ldap
+    - php{{ centos_php_version }}-php-gd
+    - php{{ centos_php_version }}-php-mbstring
+    - php{{ centos_php_version }}-php-bcmath
+    - php{{ centos_php_version }}-php-mysqlnd

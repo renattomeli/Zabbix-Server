@@ -1,0 +1,69 @@
+---
+  - name: Check if php is already installed ({{ansible_distribution}})
+    shell: >
+      yum list installed | grep php | awk '{print $1}'
+    args:
+      warn: false
+    register: php_installed_version_centos
+    tags:
+      - php-fpm
+
+  - name: trying to remove old versions ({{ansible_distribution}})
+    package:
+      name: "{{ item }}"
+      state: absent
+    with_items:
+      - "{{ php_installed_version_centos.stdout.splitlines() | list }}"
+    ignore_errors: true
+    tags:
+      - php-fpm
+
+  - name: Install PHP remi repository (CentOS)
+    yum_repository:
+      name: remi
+      description: Remi's RPM repository for Enterprise Linux 7 - $basearch
+      mirrorlist: "http://cdn.remirepo.net/enterprise/{{ansible_distribution_version[:1]}}/remi/mirror"
+      gpgkey: https://rpms.remirepo.net/RPM-GPG-KEY-remi
+      gpgcheck: yes
+    when: ansible_distribution_version != "2" and ansible_distribution=="CentOS"
+    tags:
+      - php-fpm
+
+  - name: Install PHP remi repository (Amazon)
+    yum_repository:
+      name: remi
+      description: Remi's RPM repository for Enterprise Linux 7 - $basearch
+      mirrorlist: "http://cdn.remirepo.net/enterprise/7/remi/mirror"
+      gpgkey: https://rpms.remirepo.net/RPM-GPG-KEY-remi
+      gpgcheck: yes
+    when: ansible_distribution_version == "2" and ansible_distribution=="Amazon"
+    tags:
+      - php-fpm
+
+  - name: Install php packages
+    package:
+      name: "{{ item }}"
+      state: latest
+    with_items:
+      - "{{ packages[ansible_os_family] }}"
+    tags:
+      - php-fpm
+    notify:
+      - restart php-fpm for RedHat
+
+  - name: Install default pool configuration ({{ansible_distribution}})
+    template:
+      src: "pool/pool.conf.{{ ansible_os_family | lower }}.j2"
+      dest: "{{ RedHat_package[php_set_version]['destination'] }}"
+    tags:
+      - php-fpm
+    notify:
+      - restart php-fpm for RedHat
+
+  - name: Set alternatives php version
+    alternatives:
+      name: php
+      link: /usr/bin/php
+      path: "{{ RedHat_package[php_set_version]['binary_path'] }}"
+    tags:
+      - php-fpm

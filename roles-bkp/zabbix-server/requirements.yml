@@ -1,0 +1,14 @@
+---
+
+  - name: common
+    src: https://gitlab.com/Rivendel-Labs/ansible/roles/common/repository/master/archive.tar.gz?private_token=D2SZKVPuCg2Sks-yy8D7
+
+  - name: mysql
+    src: https://gitlab.com/Rivendel-Labs/ansible/roles/mysql/repository/master/archive.tar.gz?private_token=D2SZKVPuCg2Sks-yy8D7
+
+  - name: nginx
+    src: https://gitlab.com/Rivendel-Labs/ansible/roles/nginx/repository/master/archive.tar.gz?private_token=D2SZKVPuCg2Sks-yy8D7
+
+  - name: php-fpm
+    src: https://gitlab.com/Rivendel-Labs/ansible/roles/php-fpm/repository/master/archive.tar.gz?private_token=D2SZKVPuCg2Sks-yy8D7
+...

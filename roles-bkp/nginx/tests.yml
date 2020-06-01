@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  remote_user: root
+
+  vars:
+    nginx_ssl_enabled: true
+
+  roles:
+    - test

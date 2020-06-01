@@ -1,0 +1,15 @@
+---
+
+  - name: restart php-fpm for RedHat
+    become: true
+    service:
+      name: php{{ centos_php_version }}-php-fpm
+      state: restarted
+      enabled: yes
+
+  - name: restart php-fpm for Debian
+    become: true
+    service:
+      name: "{{ debian_package[php_version]['service_name'] }}"
+      state: restarted
+      enabled: yes
